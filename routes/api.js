@@ -9,22 +9,40 @@
 'use strict';
 
 const expect = require('chai').expect;
-const join = require("path").join
-const BoardHandler = require("../controller/BoardHandler.js");
+const ThreadsHandler = require("../controller/ThreadsHandler.js");
+const RepliesHandler = require("../controller/RepliesHandler.js");
 
 
 module.exports =  (app , db) => {
   
-  const boardHandler = new BoardHandler(db)
   
+  const threadsHandler = new ThreadsHandler(db);
+  const repliesHandler = new RepliesHandler(db);
   app.route('/api/threads/:board')
         .post((req , res) => {
 
             const board = req.params.board;
             const text = req.body.text;
             const deletePassword = req.body.delete_password;
-            //console.log("/b/" + board);
-            boardHandler.insertThread(board , text , deletePassword )
+    
+            if(!deletePassword && !text)
+            {
+              res.status(400).send("no delete_password and text");
+              return;
+            }
+            if(!deletePassword)
+            {
+              res.status(400).send("no delete_password");
+              return;
+            }
+            
+            if(!text)
+            {
+             res.status(400).send("no text");
+             return;   
+            }
+            
+            threadsHandler.insertThread(board , text , deletePassword )
             .then(doc => res.redirect("/b/" + board + '/'))
             .catch(err => console.log(err));
 
@@ -34,7 +52,7 @@ module.exports =  (app , db) => {
           const board = req.params.board;
           
          
-          boardHandler.getThreads(board)
+          threadsHandler.getThreads(board)
           .then(docs => {
                const retObj = []; 
                docs.forEach(ele => {
@@ -70,7 +88,7 @@ module.exports =  (app , db) => {
     
     const board = req.params.board; 
     const threadId = req.body.thread_id;
-    boardHandler.reportThread(board , threadId)
+    threadsHandler.reportThread(board , threadId)
     .then((doc) => {
     if (!doc.value)
     {
@@ -87,7 +105,7 @@ module.exports =  (app , db) => {
   const threadId = req.body.thread_id;
   const deletePassword = req.body.delete_password;   
   
-  boardHandler.deleteThread(board , threadId , deletePassword)
+  threadsHandler.deleteThread(board , threadId , deletePassword)
   .then(doc => {
   if (doc === "incorrect password")
   {
@@ -103,12 +121,13 @@ module.exports =  (app , db) => {
     if(!doc.result.n)
     { 
       res.status(200).send("not success");
+      
     }
     else {
     
         res.status(200).send("success");
     }
-    res.status(200).json(doc);
+
   })
   .catch(err => console.log(err)); 
   });
@@ -121,7 +140,7 @@ module.exports =  (app , db) => {
       const threadId = req.body.thread_id; 
       const text = req.body.text; 
       const deletePassword = req.body.delete_password; 
-      boardHandler.addReply(board , threadId ,text , deletePassword)
+      repliesHandler.addReply(board , threadId ,text , deletePassword)
       .then(doc => res.redirect("/b/" + board + '/' + threadId ))
       .catch(err => console.log(err));
   })
@@ -131,9 +150,12 @@ module.exports =  (app , db) => {
     const board = req.params.board; 
     const threadId = req.query.thread_id;
     
-    boardHandler.getReplies(board , threadId)
+    repliesHandler.getReplies(board , threadId)
     .then(doc => {
-      if(!doc) res.status(422).send("no thread");
+      if(!doc) {
+        res.status(422).send("no thread");
+        return;
+      }
       doc.replies.sort((a,b) => { 
       return b.created_on.getTime() - a.created_on.getTime(); 
       });
@@ -162,10 +184,10 @@ module.exports =  (app , db) => {
    const threadId = req.body.thread_id;
    const replyId = req.body.reply_id; 
     
-   boardHandler.reportReply(board , threadId , replyId)
+   repliesHandler.reportReply(board , threadId , replyId)
    .then(doc => {
    if (!doc.result.n)
-   {  console.log("HERE IS THE DOC", doc);
+   {  
      res.status(400).send("not success");
      return;
    }
@@ -179,7 +201,7 @@ module.exports =  (app , db) => {
     const threadId = req.body.thread_id;
     const replyId = req.body.reply_id; 
     const deletePassword = req.body.delete_password; 
-    boardHandler.deleteReply(board , threadId , replyId , deletePassword)
+    repliesHandler.deleteReply(board , threadId , replyId , deletePassword)
     .then(doc => {
     if (doc === "wrong thread")
     {
@@ -197,7 +219,7 @@ module.exports =  (app , db) => {
       res.status(200).send("wrong reply_id");  
       return; 
     }
-    res.status(200).json(doc);   
+    res.status(200).send(doc);   
     })
     .catch(err => console.log(err));
   });
